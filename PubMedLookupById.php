@@ -203,6 +203,7 @@ class PubMedLookupById extends AbstractExternalModule
                     },
                     success: function(data) {
                         if (data != '') {
+                        console.log(data);
                             var array = JSON.parse(data);
                             jQuery.each(array,function(index,value) {
                                 $('input[name='+index+']').val(value);
@@ -295,7 +296,10 @@ class PubMedLookupById extends AbstractExternalModule
             for ($i = 0; $i < $allNodes->length; $i++) {
                 $parentMatch = false;
                 $node = $allNodes->item($i);
-
+                echo "Node:<br/>";
+                echo "<pre>";
+                print_r($node);
+                echo "</pre>";
                 if (!empty($attributeArray)) {
                     foreach ($attributeArray as $tag => $tagValue) {
                         if ($node->hasAttribute($tag) && ($node->getAttribute($tag) == $tagValue || $tagValue == "")) {
