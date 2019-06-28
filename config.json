@@ -1,0 +1,68 @@
+{
+  "name": "Pubmed Article Search By ID",
+
+  "namespace": "Vanderbilt\\PubMedLookupById",
+
+  "authors": [
+    {
+      "name": "Ryan Moore",
+      "email": "datacore@vanderbilt.edu",
+      "institution": "Vanderbilt University Medical Center"
+    }
+  ],
+
+  "description": "Look up information about a PubMed article based on ID. Will fill information into REDCap fields, based on matching the data field to a data point in the XML output from PubMed.",
+
+  "permissions": [
+    "select_data",
+    "redcap_data_entry_form",
+    "redcap_survey_page",
+    "redcap_save_record"
+  ],
+
+  "links": {
+    "project": [
+
+    ]
+  },
+
+  "no-auth-pages":[""],
+
+  "project-settings": [
+    {
+      "key": "source",
+      "name": "Field with PubMed Article ID",
+      "required": true,
+      "type": "field-list"
+    },
+    {
+      "key": "repeat-fields",
+      "name": "Field Pair of PubMed Data Point to REDCap Field",
+      "type": "sub_settings",
+      "repeatable": true,
+      "sub_settings":[
+        {
+          "key": "source-field",
+          "name": "Data Point in PubMed",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "destination-field",
+          "name": "Field in REDCap",
+          "type": "field-list",
+          "required": true
+        }
+      ]
+    }
+  ],
+
+  "system-settings": [
+  ],
+  "compatibility": {
+    "php-version-min": "5.5.0",
+    "php-version-max": "",
+    "redcap-version-min": "8.0.0",
+    "redcap-version-max": ""
+  }
+}
