@@ -204,6 +204,7 @@ class PubMedLookupById extends AbstractExternalModule
                     success: function(data) {
                         if (data != '') {
                             var array = JSON.parse(data);
+                            console.log(array);
                             jQuery.each(array,function(index,value) {
                                 $('input[name='+index+']').text(value);
                             });
