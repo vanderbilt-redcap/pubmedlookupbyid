@@ -291,50 +291,65 @@ class PubMedLookupById extends AbstractExternalModule
 
     function showNode($allNodes,&$nodeArray,$attributeArray = array())
     {
-        for ($i = 0; $i < $allNodes->length;$i++) {
-            $parentMatch = false;
-            $node = $allNodes->item($i);
-            if (!empty($attributeArray)) {
-                foreach ($attributeArray as $tag => $tagValue) {
-                    if ($node->hasAttribute($tag) && ($node->getAttribute($tag) == $tagValue || $tagValue == "")) {
-                        $nodeArray[$node->nodeName]['tags'][$tag] = $node->getAttribute($tag);
-                        $parentMatch = true;
-                    }
-                }
-            }
-            else {
-                $parentMatch = true;
-            }
-            foreach ($node->childNodes as $child) {
-                $matchAtrribute = false;
-                if ($this->hasChild($child)) {
-                    $this->shownode($child,$nodeArray,$attributeArray);
-                }
-                else {
-                    if ($child->nodeType == XML_ELEMENT_NODE) {
-                        if (!empty($attributeArray) && !$parentMatch) {
-                            foreach ($attributeArray as $tag => $tagValue) {
-                                if ($child->hasAttribute($tag) && ($child->getAttribute($tag) == $tagValue || $tagValue == "")) {
-                                    $nodeArray[$child->nodeName]['tags'][$tag] = $child->getAttribute($tag);
-                                    $matchAtrribute = true;
-                                }
-                            }
-                        } elseif ($parentMatch) {
-                            $matchAtrribute = true;
-                        }
-                        if ($matchAtrribute) {
-                            $nodeArray[$child->nodeName]['value'] = $child->nodeValue;
+        if (get_class($allNodes) == "DOMNodeList") {
+            for ($i = 0; $i < $allNodes->length; $i++) {
+                $parentMatch = false;
+                $node = $allNodes->item($i);
+
+                if (!empty($attributeArray)) {
+                    foreach ($attributeArray as $tag => $tagValue) {
+                        if ($node->hasAttribute($tag) && ($node->getAttribute($tag) == $tagValue || $tagValue == "")) {
+                            $nodeArray[$node->nodeName]['tags'][$tag] = $node->getAttribute($tag);
+                            $parentMatch = true;
                         }
                     }
+                } else {
+                    $parentMatch = true;
                 }
-            }
-            /*if ($node->nodeName == "#text" || $allNodes->length == 1) {
                 foreach ($node->childNodes as $child) {
-                    if (hasChild($child)) {
-                        showNode($child, $nodeArray, $attributeArray);
-                    } elseif ($child->nodeType == XML_ELEMENT_NODE) {
-                        $matchAtrribute = false;
-                        if (!empty($attributeArray)) {
+                    $matchAtrribute = false;
+                    if ($this->hasChild($child)) {
+                        $this->shownode($child, $nodeArray, $attributeArray);
+                    } else {
+                        if ($child->nodeType == XML_ELEMENT_NODE) {
+                            if (!empty($attributeArray) && !$parentMatch) {
+                                foreach ($attributeArray as $tag => $tagValue) {
+                                    if ($child->hasAttribute($tag) && ($child->getAttribute($tag) == $tagValue || $tagValue == "")) {
+                                        $nodeArray[$child->nodeName]['tags'][$tag] = $child->getAttribute($tag);
+                                        $matchAtrribute = true;
+                                    }
+                                }
+                            } elseif ($parentMatch) {
+                                $matchAtrribute = true;
+                            }
+                            if ($matchAtrribute) {
+                                $nodeArray[$child->nodeName]['value'] = $child->nodeValue;
+                            }
+                        }
+                    }
+                }
+                /*if ($node->nodeName == "#text" || $allNodes->length == 1) {
+                    foreach ($node->childNodes as $child) {
+                        if (hasChild($child)) {
+                            showNode($child, $nodeArray, $attributeArray);
+                        } elseif ($child->nodeType == XML_ELEMENT_NODE) {
+                            $matchAtrribute = false;
+                            if (!empty($attributeArray)) {
+                                foreach ($attributeArray as $tag => $tagValue) {
+                                    if ($child->hasAttribute($tag) && ($child->getAttribute($tag) == $tagValue || $tagValue == "")) {
+                                        $nodeArray[$child->nodeName]['tags'][$tag] = $child->getAttribute($tag);
+                                        $matchAtrribute = true;
+                                        break;
+                                    }
+                                }
+                            } else {
+                                $matchAtrribute = true;
+                            }
+                            if ($matchAtrribute) {
+                                $nodeArray[$child->nodeName]['value'] = $child->nodeValue;
+                            }
+                        } elseif ($child->nodeValue != "" && $child->nodeName != '#text') {
+                            $nodeArray[$child->nodeName]['value'] = $child->nodeValue;
                             foreach ($attributeArray as $tag => $tagValue) {
                                 if ($child->hasAttribute($tag) && ($child->getAttribute($tag) == $tagValue || $tagValue == "")) {
                                     $nodeArray[$child->nodeName]['tags'][$tag] = $child->getAttribute($tag);
@@ -343,41 +358,42 @@ class PubMedLookupById extends AbstractExternalModule
                                 }
                             }
                         } else {
+                            $nodeArray[$node->nodeName]['value'] = $node->nodeValue;
+                            foreach ($attributeArray as $tag => $tagValue) {
+                                if ($node->hasAttribute($tag) && ($node->getAttribute($tag) == $tagValue || $tagValue == "")) {
+                                    $nodeArray[$node->nodeName]['tags'][$tag] = $node->getAttribute($tag);
+                                    $matchAtrribute = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    $nodeArray[$node->nodeName]['value'] = $node->nodeValue;
+                    foreach ($attributeArray as $tag => $tagValue) {
+                        if ($node->hasAttribute($tag) && ($node->getAttribute($tag) == $tagValue || $tagValue == "")) {
+                            $nodeArray[$node->nodeName]['tags'][$tag] = $node->getAttribute($tag);
                             $matchAtrribute = true;
+                            break;
                         }
-                        if ($matchAtrribute) {
-                            $nodeArray[$child->nodeName]['value'] = $child->nodeValue;
-                        }
-                    } elseif ($child->nodeValue != "" && $child->nodeName != '#text') {
-                        $nodeArray[$child->nodeName]['value'] = $child->nodeValue;
-                        foreach ($attributeArray as $tag => $tagValue) {
-                            if ($child->hasAttribute($tag) && ($child->getAttribute($tag) == $tagValue || $tagValue == "")) {
-                                $nodeArray[$child->nodeName]['tags'][$tag] = $child->getAttribute($tag);
-                                $matchAtrribute = true;
-                                break;
-                            }
-                        }
-                    } else {
-                        $nodeArray[$node->nodeName]['value'] = $node->nodeValue;
-                        foreach ($attributeArray as $tag => $tagValue) {
-                            if ($node->hasAttribute($tag) && ($node->getAttribute($tag) == $tagValue || $tagValue == "")) {
-                                $nodeArray[$node->nodeName]['tags'][$tag] = $node->getAttribute($tag);
-                                $matchAtrribute = true;
-                                break;
-                            }
-                        }
+                    }
+                }*/
+            }
+        }
+        elseif ($allNodes->nodeType == XML_ELEMENT_NODE) {
+            if (!empty($attributeArray)) {
+                foreach ($attributeArray as $tag => $tagValue) {
+                    if ($allNodes->hasAttribute($tag) && ($allNodes->getAttribute($tag) == $tagValue || $tagValue == "")) {
+                        $nodeArray[$allNodes->nodeName]['tags'][$tag] = $allNodes->getAttribute($tag);
+                        $matchAtrribute = true;
                     }
                 }
             } else {
-                $nodeArray[$node->nodeName]['value'] = $node->nodeValue;
-                foreach ($attributeArray as $tag => $tagValue) {
-                    if ($node->hasAttribute($tag) && ($node->getAttribute($tag) == $tagValue || $tagValue == "")) {
-                        $nodeArray[$node->nodeName]['tags'][$tag] = $node->getAttribute($tag);
-                        $matchAtrribute = true;
-                        break;
-                    }
-                }
-            }*/
+                $matchAtrribute = true;
+            }
+            if ($matchAtrribute) {
+                $nodeArray[$allNodes->nodeName]['value'] = $allNodes->nodeValue;
+            }
         }
     }
     function hasChild($element) {
