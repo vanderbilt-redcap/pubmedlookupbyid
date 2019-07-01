@@ -24,17 +24,18 @@ class PubMedLookupById extends AbstractExternalModule
 		echo $this->createCalcuationJava($Proj,$instrument,$record,$event_id,$repeat_instance);
 	}
 
-	function redcap_save_record($project_id, $record, $instrument, $event_id, $group_id, $survey_hash = NULL, $response_id = NULL, $repeat_instance = 1) {
-		global $Proj;
+	function redcap_save_record($project_id, $record, $instrument, $event_id, $group_id, $survey_hash = NULL, $response_id = NULL, $repeat_instance = 1)
+    {
+        global $Proj;
 
-		$sourceField = $this->getProjectSetting('source');
-        if (in_array($sourceField,array_keys($_POST)) && is_numeric($_POST[$sourceField])) {
+        $sourceField = $this->getProjectSetting('source');
+        if (in_array($sourceField, array_keys($_POST)) && is_numeric($_POST[$sourceField])) {
             $destinationFields = $this->getProjectSetting('destination-field');
             $xmlFields = $this->getProjectSetting('source-field');
             $instrument = $_POST['instrument'];
 #Get the list of fields that exist on the current form
             $fieldsOnForm = $Proj->forms[$instrument]['fields'];
-            $recordData = \Records::getData($project_id, 'array', array($record), $destinationFields);
+            $recordData = \Records::getData($project_id, 'array', array($record), array_merge($destinationFields,array($sourceField)));
             $pubmedid = $recordData[$record][$event_id][$sourceField];
 
             if (is_numeric($pubmedid)) {
@@ -49,127 +50,30 @@ class PubMedLookupById extends AbstractExternalModule
                 $xmlParse = simplexml_load_string($xmlData);
                 $jsonParse = json_encode($xmlParse);
                 $xmlArray = json_decode($jsonParse, true);
-                $xmlDoc = new DOMDocument();
+                $xmlDoc = new \DOMDocument();
                 $xmlDoc->loadXML($xmlData);
+
+                $fieldChecks = array();
+                foreach ($destinationFields as $index => $destinationField) {
+                    if (in_array($destinationField, array_keys($fieldsOnForm))) continue;
+                    if (!isset($xmlFields[$index]) || $xmlFields[$index] == "") continue;
+                    $fieldChecks[$index] = $destinationField;
+                }
+                $dataArray = $this->parseXMLData($fieldChecks, $xmlFields, $xmlDoc);
+
+                $fieldsToSave = array();
+                foreach ($dataArray as $field => $value) {
+                    $fieldsToSave[$record][$event_id][$field] = $value;
+                }
+
+                $overwriteText = "overwrite";
+                if (!empty($fieldsToSave)) {
+                    $output = \Records::saveData($project_id, 'array', $fieldsToSave, $overwriteText);
+                }
             }
         }
-
-		foreach ($sourceFields as $index => $fieldName) {
-			$fieldsToSave = array();
-			# Determines whether we want to override data that already exists in a record
-			$overwriteText = ($this->getProjectSetting('source-overwrite')[$index] == "1" ? "overwrite" : "normal");
-			# Make sure that the field that we're piping was submitted on the record save
-			if (in_array($fieldName,array_keys($_POST)) && $_POST[$fieldName] != "") {
-				foreach ($destinationFields[$index] as $destIndex => $destinationField) {
-					if ($this->getDateFormat($Proj->metadata[$destinationField]['element_validation_type'],'','php') == "") continue;
-					# Make sure that we want to pipe to other events
-					if ($this->getProjectSetting('pipe-to-event')[$index][$destIndex] == "1") {
-						# Make sure that the event we're on is one of the source events for piping
-						if ($this->getProjectSetting('event-source')[$index][$destIndex] != "" && $event_id != $this->getProjectSetting('event-source')[$index][$destIndex]) continue;
-						$eventsWithForm = $Proj->getEventsFormDesignated($Proj->metadata[$destinationField]['form_name']);
-
-						# Get full list of events for this project (for this arm)
-						$eventList = array_keys($Proj->events[getArm()]['events']);
-						# Get full list of events that we want to pipe to for this source field
-						$eventPipeList = $this->getProjectSetting('event-pipe')[$index][$destIndex];
-
-						$currentEventIndex = array_search($event_id,$eventList);
-						$currentEvent = false;
-
-						foreach ($eventList as $eventIndex => $eventToPipe) {
-							if ($eventToPipe == $event_id) {
-								$currentEvent = true;
-							}
-							$postDate = new \DateTime(db_real_escape_string($_POST[$fieldName]));
-
-							if (!in_array($eventToPipe,$eventsWithForm)) continue;
-							if (!in_array($eventToPipe,$eventPipeList)) continue;
-							if ($eventToPipe == $event_id && in_array($destinationField,$fieldsOnForm)) continue;
-
-							$eventInfo = $Proj->eventInfo[$eventToPipe];
-							$daysOffset = "";
-							# If we don't specify the number of days to add per event in the project, use the project's event days offset setting
-							if ($daysAdd[$index][$destIndex] != "") {
-								//$daysOffset = $daysAdd[$index][$destIndex] * (($eventIndex - $currentEventIndex)+1);
-								$daysOffset = $daysAdd[$index][$destIndex];
-								/*$newDate = date_add($postDate,date_interval_create_from_date_string($daysAdd[$index][$destIndex].' days'));
-								$fieldsToSave[$record][$eventToPipe][$destinationField] = $newDate->format($this->getDateFormat($Proj->metadata[$destinationField]['element_validation_type'],'php'));*/
-							}
-							else {
-								$daysOffset = $eventInfo['day_offset'] - $Proj->eventInfo[$event_id]['day_offset'];
-								/*$newDate = date_add($postDate,date_interval_create_from_date_string($eventInfo['day_offset'].' days'));
-								$fieldsToSave[$record][$eventToPipe][$destinationField] = $newDate->format($this->getDateFormat($Proj->metadata[$destinationField]['element_validation_type'],'php'));*/
-							}
-
-							//if ($currentEvent) {
-								$newDate = date_add($postDate, date_interval_create_from_date_string($daysOffset . ' days'));
-								$fieldsToSave[$record][$eventToPipe][$destinationField] = $newDate->format($this->dateSaveFormat($Proj->metadata[$destinationField]['element_validation_type']));
-							//}
-
-							# Make sure whether we need to pipe into a "Start Date" date range field
-							if ($this->getProjectSetting('event-start-date')[$index][$destIndex] != "") {
-
-								$eventsWithStart = $Proj->getEventsFormDesignated($Proj->metadata[$this->getProjectSetting('event-start-date')[$index][$destIndex]]['form_name']);
-								if (in_array($eventToPipe,$eventsWithStart)) {
-									$postDate = new \DateTime(db_real_escape_string($_POST[$fieldName]));
-									$startOffset = "";
-									# Use the default start day offset value for the REDCap event unless specified in the module settings
-									if ($this->getProjectSetting('start-days-add')[$index][$destIndex] != "" && is_numeric($this->getProjectSetting('start-days-add')[$index][$destIndex])) {
-										$startOffset = (int)$this->getProjectSetting('start-days-add')[$index][$destIndex];
-									}
-									else {
-										$startOffset = '-'.(int)$eventInfo['offset_min'];
-									}
-									# Add the base amount of days to offset for the event
-									$startDate = date_add($postDate, date_interval_create_from_date_string((int)$daysOffset . ' days'));
-									# Add the amount of days necessary from the start offset
-									$startDate = date_add($startDate, date_interval_create_from_date_string($startOffset . ' days'));
-									$fieldsToSave[$record][$eventToPipe][$this->getProjectSetting('event-start-date')[$index][$destIndex]] = $startDate->format($this->dateSaveFormat($Proj->metadata[$this->getProjectSetting('event-start-date')[$index][$destIndex]]['element_validation_type']));
-								}
-							}
-							# Make sure whether we need to pipe into a "End Date" date range field
-							if ($this->getProjectSetting('event-end-date')[$index][$destIndex] != "") {
-								$eventsWithEnd = $Proj->getEventsFormDesignated($Proj->metadata[$this->getProjectSetting('event-end-date')[$index][$destIndex]]['form_name']);
-								if (in_array($eventToPipe,$eventsWithEnd)) {
-									$postDate = new \DateTime(db_real_escape_string($_POST[$fieldName]));
-									$endOffset = "";
-									# Use the default end day offset value for the REDCap event unless specified in the module settings
-									if ($this->getProjectSetting('end-days-add')[$index][$destIndex] != "" && is_numeric($this->getProjectSetting('end-days-add')[$index][$destIndex])) {
-										$endOffset = (int)$this->getProjectSetting('end-days-add')[$index][$destIndex];
-									}
-									else {
-										$endOffset = (int)$eventInfo['offset_min'];
-									}
-									# Add the base amount of days to offset for the event
-									$endDate = date_add($postDate, date_interval_create_from_date_string((int)$daysOffset . ' days'));
-									# Add the amount of days necessary from the start offset
-									$endDate = date_add($endDate, date_interval_create_from_date_string((int)$endOffset . ' days'));
-									$fieldsToSave[$record][$eventToPipe][$this->getProjectSetting('event-end-date')[$index][$destIndex]] = $endDate->format($this->dateSaveFormat($Proj->metadata[$this->getProjectSetting('event-end-date')[$index][$destIndex]]['element_validation_type']));
-								}
-							}
-							/*if (!empty($fieldsToSave)) {
-								$output = \Records::saveData($project_id,'array',$fieldsToSave,$overwriteText);
-							}*/
-						}
-					}
-					# If we're not piping to other events, make sure we pipe to any fields on the same event that aren't on the current data entry form
-					elseif (!in_array($destinationField,array_keys($fieldsOnForm))) {
-						$postDate = new \DateTime(db_real_escape_string($_POST[$fieldName]));
-						$newDate = date_add($postDate,date_interval_create_from_date_string($daysAdd[$index][$destIndex].' days'));
-
-						$fieldsToSave[$record][$event_id][$destinationField] = $newDate->format($this->dateSaveFormat($Proj->metadata[$destinationField]['element_validation_type']));
-						/*if (!empty($fieldsToSave)) {
-							$output = \Records::saveData($project_id,'array',$fieldsToSave,$overwriteText);
-						}*/
-					}
-				}
-			}
-			if (!empty($fieldsToSave)) {
-				$output = \Records::saveData($project_id,'array',$fieldsToSave,$overwriteText);
-			}
-		}
-		//exit;
-	}
+        exit;
+    }
 
 	/*function redcap_module_link_check_display($project_id, $link, $record, $instrument, $instance, $page) {
 		if(\REDCap::getUserRights(USERID)[USERID]['design'] == '1'){
@@ -405,5 +309,76 @@ class PubMedLookupById extends AbstractExternalModule
             }
         }
         return false;
+    }
+
+    /*
+	 * Parses the desired XML data points into a data array for REDCap.
+	 * @param $destinationFields Array of REDCap fields that need to be mapped to the XML.
+	 * @param $xmlFields Array of XML fields that need to be mapped to the destination fields. Indexes between $destinationFields and $xmlFields link them.
+	 * @param $xmlDoc A PHP DOMDocument object that contains the XML information.
+	 * @return Array of data fields and their calculated values.
+	 */
+    function parseXMLData($destinationFields,$xmlFields,$xmlDoc) {
+	    global $Proj;
+	    $returnArray = array();
+        foreach ($destinationFields as $index => $destinationField) {
+            $nodeArray = array();
+            /*if (!in_array($destinationField,array_keys($fieldsOnForm))) continue;
+            if (!isset($xmlFields[$index]) || $xmlFields[$index] == "") continue;*/
+            $xmlParamaters = explode(",",$xmlFields[$index]);
+            $destFieldEnum = $Proj->metadata[$destinationField]['element_validation_type'];
+            $filters = array();
+            if (isset($xmlParamaters[1]) && isset($xmlParamaters[2]) && $xmlParamaters[1] != "") {
+                $filters[$xmlParamaters[1]] = $xmlParamaters[2];
+            }
+
+            switch ($xmlParamaters[0]) {
+                case "Status":
+                case "Owner":
+                    $filterArray = array($xmlParamaters[0] => "");
+                    $searcher = $xmlDoc->getElementsByTagName("MedlineCitation");
+                    $item0 = $searcher->item(0);
+                    if ($item0->hasAttributes()) {
+                        foreach ($item0->attributes as $attr) {
+                            if ($attr->nodeName == $xmlParamaters[0]) {
+                                $returnArray[$destinationField] = $attr->nodeValue;
+                            }
+                        }
+                    }
+                    break;
+                case "AuthorFull":
+                case "AuthorShort":
+                    $searcher = $xmlDoc->getElementsByTagName("Author");
+                    $this->showNode($searcher,$nodeArray,$filters);
+
+                    if ($xmlParamaters[0] == "AuthorFull") {
+                        $returnArray[$destinationField] = $nodeArray['LastName']['value'].", ".$nodeArray['ForeName']['value'];
+                    }
+                    else {
+                        $returnArray[$destinationField] = $nodeArray['LastName']['value']." ".$nodeArray['Initials']['value'];
+                    }
+                    break;
+                case "Grant":
+                    $searcher = $xmlDoc->getElementsByTagName("Grant");
+                    $this->showNode($searcher,$nodeArray,$filters);
+                    $returnArray[$destinationField] = $nodeArray['GrantID']['value']."/".$nodeArray['Agency']['value']."/".$nodeArray['Country']['value'];
+                    break;
+                case "DateCompleted":
+                case "DateRevised":
+                case "PubDate":
+                case "ArticleDate":
+                case "PubMedPubDate":
+                    $searcher = $xmlDoc->getElementsByTagName($xmlParamaters[0]);
+                    $this->showNode($searcher,$nodeArray,$filters);
+                    $returnArray[$destinationField] = $this->parseDateArrayForREDCapField($destFieldEnum, $nodeArray,$xmlParamaters[0]);
+                    break;
+                default:
+                    $searcher = $xmlDoc->getElementsByTagName($xmlParamaters[0])->item(0);
+                    $this->showNode($searcher,$nodeArray,$filters);
+                    $returnArray[$destinationField] = $nodeArray[$xmlParamaters[0]]['value'].(isset($nodeArray[$xmlParamaters[0]]['tags']) && !empty($nodeArray[$xmlParamaters[0]]['tags']) ? " (".$nodeArray[$xmlParamaters[0]]['tags'][$xmlParamaters[1]].")" : "");
+                    break;
+            }
+        }
+        return $returnArray;
     }
 }

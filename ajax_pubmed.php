@@ -24,8 +24,14 @@ if (isset($_POST['pubmedid']) && is_numeric($projectID) && is_numeric($_POST['pu
     $xmlDoc = new DOMDocument();
     $xmlDoc->loadXML($xmlData);
 
-    $returnArray = array();
+    $fieldChecks = array();
     foreach ($destinationFields as $index => $destinationField) {
+        if (!in_array($destinationField, array_keys($fieldsOnForm))) continue;
+        if (!isset($xmlFields[$index]) || $xmlFields[$index] == "") continue;
+        $fieldChecks[$index] = $destinationField;
+    }
+    $returnArray = $module->parseXMLData($destinationFields,$xmlFields,$xmlDoc);
+    /*foreach ($destinationFields as $index => $destinationField) {
         $nodeArray = array();
         if (!in_array($destinationField,array_keys($fieldsOnForm))) continue;
         if (!isset($xmlFields[$index]) || $xmlFields[$index] == "") continue;
@@ -82,6 +88,6 @@ if (isset($_POST['pubmedid']) && is_numeric($projectID) && is_numeric($_POST['pu
                 $returnArray[$destinationField] = $nodeArray[$xmlParamaters[0]]['value'].(isset($nodeArray[$xmlParamaters[0]]['tags']) && !empty($nodeArray[$xmlParamaters[0]]['tags']) ? " (".$nodeArray[$xmlParamaters[0]]['tags'][$xmlParamaters[1]].")" : "");
                 break;
         }
-    }
+    }*/
     echo json_encode($returnArray);
 }
