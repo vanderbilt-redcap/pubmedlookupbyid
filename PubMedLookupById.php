@@ -363,9 +363,12 @@ class PubMedLookupById extends AbstractExternalModule
                     $this->showNode($searcher,$nodeArray,$filters);
                     $returnArray[$destinationField] = $nodeArray['GrantID']['value']."/".$nodeArray['Agency']['value']."/".$nodeArray['Country']['value'];
                     break;
+                case "PubDate":
+                    $searcher = $xmlDoc->getElementsByTagName("PubDate");
+                    $this->showNode($searcher,$nodeArray,$filters);
+                    $returnArray[$destinationField] = $nodeArray['Month']['value']." ".$nodeArray['Year']['value'];
                 case "DateCompleted":
                 case "DateRevised":
-                case "PubDate":
                 case "ArticleDate":
                 case "PubMedPubDate":
                     $searcher = $xmlDoc->getElementsByTagName($xmlParamaters[0]);
