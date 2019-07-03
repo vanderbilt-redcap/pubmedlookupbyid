@@ -72,7 +72,7 @@ class PubMedLookupById extends AbstractExternalModule
                 }
             }
         }
-        exit;
+        //exit;
     }
 
 	/*function redcap_module_link_check_display($project_id, $link, $record, $instrument, $instance, $page) {
